@@ -1,63 +1,65 @@
-// --- MÓDULO: PUNTO DE ENTRADA (MAIN) ---
-// Su única función es inicializar y conectar los demás módulos.
-
-import { GameLogic } from './js/gamelogic.js';
+import { GameState } from './js/state.js';
 import { UI } from './js/ui.js';
 import { Audio } from './js/audio.js';
-import { GameState } from './js/state.js';
+import { GameLogic } from './js/gamelogic.js';
 import { CommandHandler } from './js/commands.js';
 
+// --- INICIALIZACIÓN GLOBAL ---
 window.onload = () => {
-    // Inicialización del Lobby con Three.js
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    const sphere = new THREE.Mesh(new THREE.IcosahedronGeometry(2.5, 2), new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true }));
-    scene.add(sphere);
-    camera.position.z = 5;
-    function animateLobby() { 
-        GameState.threeJsAnimationId = requestAnimationFrame(animateLobby); 
-        sphere.rotation.x += 0.001; 
-        sphere.rotation.y += 0.002; 
-        renderer.render(scene, camera); 
-    }
-    animateLobby();
-    window.addEventListener('resize', () => { 
-        camera.aspect = window.innerWidth / window.innerHeight; 
-        camera.updateProjectionMatrix(); 
-        renderer.setSize(window.innerWidth, window.innerHeight); 
-    });
-
-    document.getElementById('instructions-content').textContent = `OBJETIVO: Sobrevivir el ciclo.\n\nCOMANDOS BASE:\n  ayuda, ls, leer, desencriptar\n\nCOMANDOS AVANZADOS:\n  analizar, purga, tiempo, reparar\n\nCOMANDOS SECRETOS:\n  shutdown, fragmento, anular`;
-
-    document.getElementById('start-button').addEventListener('click', async () => {
-        if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') await Tone.start();
-        if (!Audio.isSetup) Audio.setup();
-        GameState.soundsReady = true;
+    // Inicializar los módulos principales
+    UI.initialize();
+    Audio.initialize();
+    
+    // Configurar Event Listeners del Lobby
+    UI.elements.startButton.addEventListener('click', async () => {
+        if (Tone.context.state !== 'running') {
+            await Tone.start();
+        }
+        if (!GameState.soundsReady) {
+            Audio.setupSounds();
+        }
         GameLogic.startGame();
     });
-    
-    document.getElementById('instructions-button').addEventListener('click', () => document.getElementById('instructions-modal').classList.remove('hidden'));
-    document.getElementById('close-instructions-button').addEventListener('click', () => document.getElementById('instructions-modal').classList.add('hidden'));
-    
-    UI.terminalInput.addEventListener('keydown', (e) => {
-         if (e.key === 'Enter' && !UI.terminalInput.disabled) {
-            const commandText = UI.terminalInput.value.trim();
-            if (commandText === '') return;
-            GameState.recentPlayerInputs.push(...commandText.split(' '));
-            if(GameState.recentPlayerInputs.length > 10) GameState.recentPlayerInputs.shift();
-            UI.terminalInput.value = '';
-            UI.queueTerminalText(`> ${commandText}`, () => {
-                if (GameState.awaitingSpecialInput) {
-                    GameState.awaitingSpecialInput(commandText);
-                } else {
-                    CommandHandler.process(commandText);
-                }
-            }, 0);
+
+    UI.elements.instructionsButton.addEventListener('click', () => {
+        UI.elements.instructionsModal.classList.remove('hidden');
+    });
+
+    UI.elements.closeInstructionsButton.addEventListener('click', () => {
+        UI.elements.instructionsModal.classList.add('hidden');
+    });
+
+    // --- MANEJADOR DE ENTRADA DEL TECLADO (CORREGIDO) ---
+    UI.elements.terminalInput.addEventListener('keydown', (e) => {
+        // Solo procesar 'Enter' si el juego no está escribiendo y el input está activo
+        if (e.key === 'Enter' && !GameState.isTyping && !UI.elements.terminalInput.disabled) {
+            const commandText = UI.elements.terminalInput.value.trim();
+            
+            // Si no hay texto, no hacer nada
+            if (commandText.length === 0) return;
+
+            // Limpiar y desactivar el input inmediatamente
+            UI.elements.terminalInput.value = '';
+            UI.setInputActive(false);
+
+            // Mostrar el comando del jugador en la terminal y hacer scroll
+            UI.elements.terminalOutput.innerHTML += `> ${commandText}<br>`;
+            UI.scrollToBottom();
+
+            // Guardar el input para la IA y procesar el comando
+            GameLogic.logPlayerInput(commandText);
+
+            if (GameState.awaitingSpecialInput) {
+                // Si el juego espera una entrada especial (como una semilla)
+                GameState.awaitingSpecialInput(commandText);
+            } else {
+                // Procesar un comando normal
+                CommandHandler.process(commandText);
+            }
         }
     });
 
-    GameLogic.initialize();
+    // Iniciar la animación del fondo del lobby
+    UI.initLobbyBackground();
 };
 
