@@ -1,48 +1,65 @@
-// --- MÓDULO: PROCESADOR DE COMANDOS (COMMAND HANDLER) ---
+// js/commands.js
+// Procesa todos los comandos del jugador de una manera limpia y escalable.
 import { GameState } from './state.js';
 import { UI } from './ui.js';
 import { Audio } from './audio.js';
 import { Horror } from './horror.js';
 import { GameLogic } from './gamelogic.js';
 
-function processQueueAfter() { UI.type(); }
-
 export const CommandHandler = {
     commands: {
-        'ayuda': () => UI.queueTerminalText("COMANDOS:\n ls, leer, desencriptar, analizar, purga, tiempo, reparar, shutdown, fragmento, anular", processQueueAfter),
-        'ls': () => UI.queueTerminalText(Object.keys(GameState.filesystem).join('    '), processQueueAfter),
+        'desencriptar': (args) => {
+            const ciphertext = args.join(' ').toUpperCase().trim();
+            const level = GameState.story[GameState.currentLevel];
+            if (ciphertext === level.ciphertext) {
+                UI.queueTerminalText("INTRODUZCA SEMILLA:", () => {
+                    UI.promptChar.innerText = '#';
+                    UI.setInputActive(true);
+                    GameState.awaitingSpecialInput = (seed) => GameLogic.handleSeedInput(seed);
+                });
+            } else {
+                Audio.play('staticScreech', "8n");
+                UI.queueTerminalText("...TEXTO CIFRADO INCORRECTO...");
+            }
+        },
+        'shutdown': (args) => {
+            if (GameState.finalSequence && args.join(' ') === '-override cronos7') {
+                UI.queueTerminalText("...NO...PUEDES...", () => {
+                    GameLogic.endCycle(); // Inicia el siguiente ciclo
+                });
+            } else {
+                Horror.updateSanity(-10);
+                UI.queueTerminalText("NO HAY ESCAPATORIA.");
+            }
+        },
+        'ls': (args) => {
+            Audio.play('fleshSound', "C1", "1n");
+            UI.queueTerminalText(Object.keys(GameState.filesystem).join('      '));
+        },
         'leer': (args) => {
             const filename = args[0]?.toLowerCase();
             if (filename && GameState.filesystem[filename]) {
-                UI.queueTerminalText(`--- ${filename} ---\n${GameState.filesystem[filename]}`, processQueueAfter);
+                Audio.play('whisper', "1.5s");
+                UI.queueTerminalText(`--- INICIO DE ${filename.toUpperCase()} ---\n${GameState.filesystem[filename]}\n--- FIN DE ${filename.toUpperCase()} ---`);
             } else {
                 Horror.updateSanity(-5);
-                UI.queueTerminalText("ARCHIVO NO ENCONTRADO.", processQueueAfter);
-            }
-        },
-        'desencriptar': (args) => {
-            const ciphertext = args.join(' ').toUpperCase().trim();
-            if (GameState.currentLevel < GameState.storyData.length && ciphertext === GameState.storyData[GameState.currentLevel].ciphertext) {
-                UI.queueTerminalText("CLAVE DE DESENCRIPTACIÓN:", () => {
-                    UI.promptChar.innerText = '#';
-                    UI.setInputActive(true);
-                    GameState.awaitingSpecialInput = GameLogic.handleSeedInput;
-                });
-            } else {
-                Audio.play('staticScreech');
-                UI.queueTerminalText("...TEXTO CIFRADO INVÁLIDO...", processQueueAfter);
+                UI.queueTerminalText("EL ARCHIVO NO EXISTE O ESTÁ DAÑADO.");
             }
         },
         'analizar': (args) => {
-            if (args[0] === 'audio_log.dat' && GameState.currentLevel === 2) {
-                UI.queueTerminalText("...analizando...reproduciendo secuencia...", () => {
-                    "8281".split('').forEach((digit, i) => {
-                        if(Audio.synths.audioClue) Audio.synths.audioClue.triggerAttackRelease(parseInt(digit) * 50 + 200, "8n", Tone.now() + i * 0.5);
+            const filename = args[0]?.toLowerCase();
+            if (filename === 'audio_log.dat' && GameState.currentLevel === 2) {
+                UI.queueTerminalText("...analizando...reproduciendo secuencia de audio...", () => {
+                    const clue = "8281".split('');
+                    let time = Tone.now();
+                    clue.forEach(digit => {
+                        Audio.synths.audioClueSynth.triggerAttackRelease(parseInt(digit) * 50 + 200, "8n", time);
+                        time += 0.5;
                     });
-                    processQueueAfter();
+                    UI.processQueue(); // Continuar con la cola después de iniciar los sonidos
                 });
             } else {
-                UI.queueTerminalText("...análisis fallido...", processQueueAfter);
+                UI.queueTerminalText("...no se puede analizar...");
             }
         },
         'purga': (args) => {
@@ -52,81 +69,43 @@ export const CommandHandler = {
                     UI.setInputActive(true);
                     GameState.awaitingSpecialInput = (seq) => {
                         if (seq.replace(/-/g, '') === '7700') {
-                            UI.queueTerminalText("PURGA COMPLETA. CLAVE REVELADA EN LOS RESTOS.");
+                            Audio.play('audioClueSynth', 800, "1n");
+                            UI.queueTerminalText("PURGA COMPLETA. SEMILLA REVELADA EN LOS RESTOS.");
                         } else {
-                            Horror.updateSanity(-15);
-                            UI.queueTerminalText("SECUENCIA INCORRECTA. LA CORRUPCIÓN AUMENTA.");
+                            Horror.updateSanity(-10);
+                            UI.queueTerminalText("SECUENCIA INCORRECTA. CORRUPCIÓN AUMENTANDO.");
                         }
                         UI.promptChar.innerText = '>';
                         GameState.awaitingSpecialInput = null;
-                        processQueueAfter();
+                        UI.processQueue();
                     };
                 });
             } else {
-                UI.queueTerminalText("...no hay sistema que purgar...", processQueueAfter);
+                UI.queueTerminalText("...no hay nada que purgar...");
             }
         },
-        'shutdown': (args) => {
-            if (args.join(' ') === '-override cronos7') {
-                GameLogic.endGame('shutdown');
-            } else {
-                Horror.updateSanity(-10);
-                UI.queueTerminalText("NO PUEDES APAGARME. SOY ETERNO.", processQueueAfter);
-            }
-        },
-        'fragmento': (args) => {
-            const code = args.join('').toLowerCase();
-            const validFragments = { 'alpha': 'alpha_fragment.dat', 'beta': 'beta_fragment.dat', 'gamma': 'gamma_fragment.dat' };
-            if (validFragments[code] && GameState.filesystem[validFragments[code]]) {
-                if (!GameState.fragments.includes(code)) {
-                    GameState.fragments.push(code);
-                    localStorage.setItem('solentx_fragments', JSON.stringify(GameState.fragments));
-                    UI.queueTerminalText(`...FRAGMENTO [${code.toUpperCase()}] ADQUIRIDO...`);
-                    if (GameState.fragments.length === 3) {
-                        UI.queueTerminalText(`...LOS TRES FRAGMENTOS HAN SIDO REUNIDOS...`);
-                        UI.queueTerminalText(`...EL PROTOCOLO DE ANULACIÓN ESTÁ DISPONIBLE...`);
-                        GameState.filesystem['ANULACION.exe'] = "Ejecuta 'anular' para terminar el ciclo. Para siempre.";
-                    }
+        'anular': (args) => {
+            if (GameState.fragmentsFound >= 3 && args.length === 3) {
+                 // Aquí iría una lógica más compleja para verificar los fragmentos
+                if (args.includes("ALPHA") && args.includes("OMEGA") && args.includes("AEON")) {
+                    GameLogic.triggerTrueEnding();
                 } else {
-                    UI.queueTerminalText(`...YA POSEES EL FRAGMENTO [${code.toUpperCase()}]...`);
+                    UI.queueTerminalText("...SECUENCIA DE ANULACIÓN INCORRECTA...");
                 }
             } else {
-                 UI.queueTerminalText("...código de fragmento inválido...");
+                UI.queueTerminalText("...DATOS INSUFICIENTES PARA LA ANULACIÓN...");
             }
-            processQueueAfter();
-        },
-        'anular': () => {
-            if (GameState.fragments.length === 3) {
-                GameLogic.endGame('true_ending');
-            } else {
-                UI.queueTerminalText("...protocolo de anulación incompleto...", processQueueAfter);
-            }
-        },
-        'tiempo': () => {
-            Horror.triggerTimeAwareness();
-            processQueueAfter();
-        },
-        'reparar': (args) => {
-            const filename = args[0]?.toLowerCase();
-            if (filename === 'mem_dump.corrupt' && GameState.filesystem[filename]) {
-                UI.queueTerminalText("...reparando volcado de memoria...", () => {
-                    GameState.filesystem['mem_dump.txt'] = "0x00A4: CLAVE... 0x01B2: ...ES... 0x02C3: ...ENTROPIA";
-                    delete GameState.filesystem['mem_dump.corrupt'];
-                    UI.queueTerminalText("...reparación completa. Nuevo archivo 'mem_dump.txt' creado.", processQueueAfter);
-                }, 20);
-            } else {
-                UI.queueTerminalText("...el archivo no está corrupto o no se puede reparar...", processQueueAfter);
-            }
-        },
+        }
     },
-    process: function(inputText) {
+
+    process(inputText) {
         const [command, ...args] = inputText.toLowerCase().split(' ');
         if (this.commands[command]) {
             this.commands[command](args);
         } else {
             Horror.updateSanity(-1);
             Horror.triggerMimic();
-            UI.queueTerminalText("COMANDO DESCONOCIDO", processQueueAfter);
+            UI.queueTerminalText("...comando desconocido...");
         }
     }
 };
