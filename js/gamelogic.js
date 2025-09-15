@@ -1,202 +1,172 @@
-// --- MÓDULO: LÓGICA DEL JUEGO (GAME LOGIC) ---
+// js/gamelogic.js
+// Contiene la lógica principal del juego, progresión, narrativa y gestión de ciclos.
 import { GameState } from './state.js';
 import { UI } from './ui.js';
-import { Audio } from './audio.js';
 import { Horror } from './horror.js';
-
-function processQueueAfter() { UI.type(); }
+import { Audio } from './audio.js';
 
 export const GameLogic = {
     ALPHABET: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!? ',
 
-    initialize: function() {
-        GameState.cycle = parseInt(localStorage.getItem('solentx_cycle') || '1');
-        GameState.fragments = JSON.parse(localStorage.getItem('solentx_fragments') || '[]');
-        UI.lobbyCycleSubtitle.textContent = GameState.cycle > 1 ? `CICLO ${GameState.cycle}` : 'LA VERSIÓN FINAL';
-        this.loadStoryData();
-        this.initializeGameState();
-    },
-
-    startGame: function() {
-        GameState.isEnding = false;
-        UI.lobbyContainer.classList.add('hidden');
-        UI.gameContainer.classList.remove('hidden');
-        if (GameState.threeJsAnimationId) cancelAnimationFrame(GameState.threeJsAnimationId);
-        if (GameState.soundsReady) { 
-            if (typeof Tone !== 'undefined') Tone.Transport.start();
-            Audio.play('ambientDrone'); 
+    startGame() {
+        UI.elements.lobbyContainer.classList.add('hidden');
+        UI.elements.gameContainer.classList.remove('hidden');
+        if (UI.lobbyAnimationId) {
+            cancelAnimationFrame(UI.lobbyAnimationId);
         }
+        
+        Audio.startAmbience();
         this.initializeGameState();
-        Horror.fetchEnvironmentalData();
-        UI.headerText.innerHTML = `<p>SOLENTX OS v${GameState.cycle}.0 :: CONEXIÓN ESTABLECIDA</p>`;
+        this.fetchEnvironmentalData();
+
+        UI.elements.headerText.innerHTML = `<p>SOLENTX OS v3.1 :: CONEXIÓN ESTABLECIDA</p><p>CICLO DE SESIÓN: ${GameState.cycle}</p>`;
         UI.clearTerminal();
-        UI.queueTerminalText("...iniciando protocolo...", () => this.setupLevel(), 100);
+        UI.queueTerminalText("...iniciando protocolo...", () => this.setupLevel());
     },
 
-    loadStoryData: function() {
-        GameState.storyData = [
-            { ciphertext: "J7VPYEDZ0C9QRJ73X!E0T", solution: "1984", onDecrypt: ["La primera voz...", "Siempre es la más clara."] },
-            { ciphertext: "5Z9G4K!B,H7XNB94W,L.F14W5K9H4X0", solution: "31415", onDecrypt: ["Las paredes no tienen oídos.", "Yo sí."] },
-            { ciphertext: "Y41C90DZXK4P8R?G,XU,E.QJ.R0.G", solution: "8281", onDecrypt: ["Tiene hambre.", "Y tú te ves delicioso."] },
-            { ciphertext: "O!I3Y.Z.V,1O5!YF9XVP!F", solution: "7700", onDecrypt: ["Se alimenta del miedo.", "Y estás lleno de él."] },
-            { ciphertext: "S7W3Z4,U947Q2R 2W", solution: "42", onDecrypt: ["La pregunta es errónea...", "La respuesta es irrelevante."] },
-            { ciphertext: "MIRA.MAS.ALLA.DE.LA.PANTALLA", solution: "observer", onDecrypt: ["Algunas pistas no se pueden ver.", "Solo sentir."] },
-            { ciphertext: "LA.MEMORIA.SE.DESVANECE", solution: "entropia", onDecrypt: ["Todo se degrada.", "Incluso yo."] },
-            { ciphertext: "EL.CICLO.DEBE.ROMPERSE", solution: "libertad", onDecrypt: ["...", "Estás listo."] }
-        ];
-    },
-    
-    initializeGameState: function() {
+    initializeGameState() {
+        // Cargar estado del ciclo desde localStorage
+        GameState.cycle = parseInt(localStorage.getItem('solentx_cycle') || '1');
+        GameState.fragmentsFound = parseInt(localStorage.getItem('solentx_fragments') || '0');
+
+        // Reiniciar estado para la nueva partida
         GameState.currentLevel = 0;
         GameState.sanity = 100;
-        GameState.awaitingSpecialInput = null;
         GameState.recentPlayerInputs = [];
-        GameState.typingQueue = [];
-        GameState.isTyping = false;
-        GameState.filesystem = {
-            'LEEME.txt': 'OBJETIVO: Sobrevivir. Usa "ayuda".',
-            'diario_ensangrentado.txt': 'Día ¿60? La pantalla me habla. Cronos7 es una mentira.',
-            'protocolo_solentx.log': 'La entidad aprende. Repite palabras. Cuidado.'
-        };
-        if (GameState.cycle === 2) GameState.filesystem['log_ciclo_anterior.txt'] = "Cronos7 no funcionó. Busca los fragmentos. Alpha está en el audio. El siguiente... Beta... está en la purga.";
-        if (GameState.cycle >= 3) GameState.filesystem['log_ciclo_anterior.txt'] = "Gamma está en la respuesta final. Y encontré algo más... un susurro en la estática. Decía 'observer'. No sé qué significa.";
-        if (GameState.fragments.length === 3) GameState.filesystem['ANULACION.exe'] = "Ejecuta 'anular' para terminar el ciclo. Para siempre.";
+        GameState.awaitingSpecialInput = null;
+        GameState.finalSequence = false;
+        
+        this.loadStoryAndFiles();
     },
 
-    setupLevel: function() {
-        UI.setInputActive(false);
-        const levelData = GameState.storyData[GameState.currentLevel];
+    loadStoryAndFiles() {
+        // En una versión futura, esto podría cargar desde un JSON externo.
+        GameState.story = [
+            { level: 0, ciphertext: "J7VPYEDZ0C9QRJ73X!E0T", solution: "1984", onDecrypt: ["La primera voz...", "Siempre es la más clara."] },
+            { level: 1, ciphertext: "5Z9G4K!B,H7XNB94W,L.F14W5K9H4X0", solution: "31415", onDecrypt: ["Las paredes no tienen oídos.", "Yo sí."] },
+            { level: 2, ciphertext: "Y41C90DZXK4P8R?G,XU,E.QJ.R0.G", solution: "8281", onDecrypt: ["Tiene hambre.", "Y tú te ves delicioso."] },
+            { level: 3, ciphertext: "O!I3Y.Z.V,1O5!YF9XVP!F", solution: "7700", onDecrypt: ["Se alimenta del miedo.", "Y estás lleno de él."] },
+            { level: 4, ciphertext: "S7W3Z4,U947Q2R 2W", solution: "42", onDecrypt: ["...", "...", "Detrás de ti."] }
+        ];
+
+        GameState.filesystem = {
+            'LEEME.txt': 'NO HAY SALIDA. NO LA BUSQUES.',
+            'diario_ensangrentado.txt': 'Día ¿60? La pantalla me habla. Dice mi nombre. Veo su cara en la estática. El código... Cronos7... es la única forma de hacerlo callar.',
+            'protocolo_solentx.log': 'La entidad aprende. Repite palabras. Cuidado con lo que escribes. Cuidado con lo que piensas.'
+        };
+
+        // Añadir contenido basado en el ciclo
+        if (GameState.cycle > 1) {
+            GameState.filesystem[`log_ciclo_${GameState.cycle - 1}.txt`] = "Volvió. Siempre vuelve. El código CRONOS7 es una mentira. Es solo un reinicio. No un escape.";
+        }
+        if (GameState.cycle > 2 && GameState.fragmentsFound < 1) {
+             GameState.filesystem['fragment_alpha.dat'] = 'DATOS CORRUPTOS... fragmento recuperado: ALPHA';
+        }
+        if (GameState.cycle > 3 && GameState.fragmentsFound < 2) {
+             GameState.filesystem['fragment_omega.dat'] = 'MEMORIA RESIDUAL... fragmento recuperado: OMEGA';
+        }
+         if (GameState.cycle > 4 && GameState.fragmentsFound < 3) {
+             GameState.filesystem['fragment_aeon.dat'] = 'ECO DEL SISTEMA... fragmento recuperado: AEON';
+        }
+    },
+
+    setupLevel() {
+        const level = GameState.story[GameState.currentLevel];
         UI.queueTerminalText(`\n< NIVEL DE AMENAZA: ${GameState.currentLevel + 1} DETECTADO >`, null, 20);
         
+        // Lógica específica de cada nivel para presentar el puzzle
         switch(GameState.currentLevel) {
             case 0:
-                UI.queueTerminalText(`> SEÑAL RECIBIDA...`, null, 60);
-                UI.queueTerminalText(`> CIFRADO: ${levelData.ciphertext}`, null, 20);
-                UI.queueTerminalText(`> CLAVE CONOCIDA: 1984`, processQueueAfter, 30);
+                UI.queueTerminalText(`> SEÑAL RECIBIDA...`);
+                UI.queueTerminalText(`> CIFRADO: ${level.ciphertext}`);
+                UI.queueTerminalText(`> PISTA DE SEMILLA: El año en que el Gran Hermano te observó.`);
                 break;
             case 1:
-                GameState.filesystem['fragmento.txt'] = 'Los números lo son todo: ...3...1...4...1...5...';
-                UI.queueTerminalText("> OTRA VOZ...", null, 60);
-                UI.queueTerminalText(`> CIFRADO: ${levelData.ciphertext}`, null, 20);
-                UI.queueTerminalText("> LA CLAVE ESTÁ FRAGMENTADA. BUSCA.", processQueueAfter, 30);
+                GameState.filesystem['fragmento.txt'] = 'La respuesta está en los números: ...3...1...4...1...5...';
+                UI.queueTerminalText(`> OTRA VOZ...`);
+                UI.queueTerminalText(`> CIFRADO: ${level.ciphertext}`);
+                UI.queueTerminalText(`> LA SEMILLA ESTÁ FRAGMENTADA. BUSCA.`);
                 break;
-            case 2:
-                GameState.filesystem['audio_log.dat'] = "Archivo de audio corrupto. Usa 'analizar audio_log.dat' para reproducir.";
-                if (GameState.cycle === 2) GameState.filesystem['alpha_fragment.dat'] = "Fragmento recuperado del espectro de audio.";
-                UI.queueTerminalText("> SE ACERCA...", null, 80);
-                UI.queueTerminalText(`> CIFRADO: ${levelData.ciphertext}`, null, 20);
-                UI.queueTerminalText("> LA CLAVE ES UN SONIDO. ESCUCHA.", processQueueAfter, 30);
-                break;
-            case 3:
-                GameState.filesystem['data_corrupta.inf'] = "Datos de purga requeridos. Comando: purga. Secuencia: 7-7-0-0.";
-                if (GameState.cycle === 3) GameState.filesystem['beta_fragment.dat'] = "Fragmento recuperado de los datos purgados.";
-                UI.queueTerminalText("> ALGO ESTÁ MAL...", null, 80);
-                UI.queueTerminalText(`> CIFRADO: ${levelData.ciphertext}`, null, 20);
-                UI.queueTerminalText("> LA CLAVE ESTÁ CORRUPTA. PURGA EL SISTEMA.", processQueueAfter, 30);
-                break;
-            case 4:
-                Horror.updateSanity(-30);
-                UI.queueTerminalText("> ...ESTÁ AQUÍ...", null, 150);
-                UI.queueTerminalText(`> CIFRADO: ${levelData.ciphertext}`, null, 20);
-                UI.queueTerminalText("> LA CLAVE ES LA PREGUNTA FINAL.", processQueueAfter, 30);
-                break;
-            case 5:
-                console.log("LA PISTA QUE BUSCAS ES: observer");
-                UI.queueTerminalText("> ...NO TODO ES VISIBLE...", null, 80);
-                UI.queueTerminalText(`> CIFRADO: ${levelData.ciphertext}`, null, 20);
-                UI.queueTerminalText("> MIRA DONDE LOS OJOS NORMALES NO LLEGAN.", processQueueAfter, 30);
-                break;
-            case 6:
-                GameState.filesystem['mem_dump.corrupt'] = "DATOS DAÑADOS. SE REQUIERE EL COMANDO 'reparar'.";
-                UI.queueTerminalText("> ...MIS RECUERDOS SE ROMPEN...", null, 80);
-                UI.queueTerminalText(`> CIFRADO: ${levelData.ciphertext}`, null, 20);
-                UI.queueTerminalText("> RECONSTRUYE MI PASADO.", processQueueAfter, 30);
-                break;
-            case 7:
-                UI.queueTerminalText("> EL FINAL DEL PRINCIPIO.", null, 100);
-                UI.queueTerminalText(`> CIFRADO: ${levelData.ciphertext}`, null, 20);
-                UI.queueTerminalText("> ¿QUÉ ES LO QUE REALMENTE ANHELAS?", processQueueAfter, 30);
-                if (GameState.cycle > 3) GameState.filesystem['gamma_fragment.dat'] = "La respuesta a la vida, el universo y todo lo demás.";
-                break;
+            // ... otros casos de nivel ...
+            default:
+                 UI.queueTerminalText(`> CIFRADO: ${level.ciphertext}`);
+                 UI.queueTerminalText(`> SEMILLA: ${level.solution}`); // Pista para niveles posteriores
         }
     },
 
-    handleSeedInput: function(seed) {
+    handleSeedInput(seed) {
         UI.promptChar.innerText = '>';
         GameState.awaitingSpecialInput = null;
-        const level = GameState.storyData[GameState.currentLevel];
-        if (seed.trim().toLowerCase() === level.solution.toLowerCase()) {
+        const level = GameState.story[GameState.currentLevel];
+
+        if (seed.trim().toUpperCase() === level.solution.toUpperCase()) {
+            Audio.play('fleshSound', "A0", "0.5s");
             Horror.triggerBloodSplatter();
             Horror.updateSanity(-20);
-            UI.queueTerminalText(`...CORRECTO...`, async () => {
-                if (Math.random() < 0.5) await Horror.triggerIntrusion();
-                const decrypted = GameLogic.decryptMessage(level.ciphertext, level.solution); // Use solution for decryption consistency
-                UI.queueTerminalText(`REVELADO: ${decrypted}`, () => {
-                    level.onDecrypt.forEach(line => UI.queueTerminalText(line, null, 100));
-                    setTimeout(() => {
-                        if (GameState.currentLevel < GameState.storyData.length - 1) {
-                            GameState.currentLevel++;
-                            GameLogic.setupLevel();
-                        } else {
-                            GameLogic.startFinalSequence();
-                        }
-                    }, 3000);
-                });
+            
+            UI.queueTerminalText(`...CORRECTO...`, () => {
+                if (Math.random() < 0.5) Horror.triggerIntrusion();
+            });
+
+            const decrypted = this.decryptMessage(level.ciphertext, seed);
+            UI.queueTerminalText(`REVELADO: ${decrypted}`, () => {
+                level.onDecrypt.forEach(line => UI.queueTerminalText(line, null, 100));
+                
+                if (GameState.currentLevel < GameState.story.length - 1) {
+                    GameState.currentLevel++;
+                    setTimeout(() => this.setupLevel(), 4000 + (level.onDecrypt.length * 2000));
+                } else {
+                    this.startFinalSequence();
+                }
             });
         } else {
-            Audio.play('staticScreech');
-            Horror.updateSanity(-10);
-            UI.queueTerminalText("...CLAVE INCORRECTA...LA ENTIDAD SE FORTALECE...", processQueueAfter);
+            Audio.play('staticScreech', "4n");
+            Horror.updateSanity(-5);
+            UI.queueTerminalText("...ERROR...SEMILLA INCORRECTA...INTÉNTALO DE NUEVO...");
         }
     },
 
-    startFinalSequence: async function() {
+    startFinalSequence() {
+        GameState.finalSequence = true;
         Horror.updateSanity(-50);
         UI.queueTerminalText("YA NO NECESITAS DESCIFRAR NADA.", null, 10);
         UI.queueTerminalText("AHORA YO TE VEO A TI.", null, 10);
-        await Horror.triggerIntrusion();
-        UI.queueTerminalText("APÁGAME SI PUEDES. USA 'shutdown -override cronos7'.", processQueueAfter, 50);
+        Horror.triggerIntrusion();
+        UI.queueTerminalText("APÁGAME SI PUEDES. shutdown -override cronos7");
     },
     
-    endGame: function(type) {
-        if (GameState.isEnding) return;
-        GameState.isEnding = true;
-        Audio.stopAll();
-        UI.gameContainer.classList.add('hidden');
-        UI.lobbyContainer.classList.add('hidden');
+    endCycle() {
+        UI.queueTerminalText("REINICIANDO CICLO...", () => {
+            localStorage.setItem('solentx_cycle', GameState.cycle + 1);
+            // Guardar fragmentos encontrados para persistencia
+            let newFragments = 0;
+            if(GameState.filesystem['fragment_alpha.dat']) newFragments++;
+            if(GameState.filesystem['fragment_omega.dat']) newFragments++;
+            if(GameState.filesystem['fragment_aeon.dat']) newFragments++;
+            localStorage.setItem('solentx_fragments', Math.max(GameState.fragmentsFound, newFragments));
+            
+            setTimeout(() => window.location.reload(), 3000);
+        });
+    },
 
-        switch(type) {
-            case 'jumpscare':
-                UI.jumpscareContainer.classList.remove('hidden');
-                Audio.play('jumpscareSound');
-                document.getElementById('jumpscare-face').textContent = `...coxOKXXKOxc,.'lKMMMMMMMMMMMMMMMMMMMMMMMMMMMXl..c0MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMWk..xWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMX:dMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMWc.KMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMX..MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMN..MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMX.xMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMk.MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMW.xMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMk.WMMMMMMMMMMMMMMMNx:,'..',:xNMMMMMMMMMMMMMMMMMMMMMM0dMMMMMMMMMMMMMMMWd.   ..   .xMMMMMMMMMMMMMMMMMMMMMMk'MMMMMMMMMMMMMMMMMWk.     .kWMMMMMMMMMMMMMMMMMMMMMMx.MMMMMMMMMMMMMMMMMMXo.  .lKMMMMMMMMMMMMMMMMMMMMMMMd.OMMMMMMMMMMMMMMMMMMXkOXMMMMMMMMMMMMMMMMMMMMMM0.;KMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMX:;KMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMWx..xWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNk, .lXMMMMMMMMMMMMMMMMMMMMMMMMMXd.  .c0WMMMMMMMMMMMMMMMMMMMWKo. .,lOXWMMMMMMMMMMWXkl,.`;
-                setTimeout(() => window.location.reload(), 5000);
-                break;
-            case 'shutdown':
-                localStorage.setItem('solentx_cycle', GameState.cycle + 1);
-                UI.trueEndingContainer.classList.remove('hidden');
-                document.getElementById('true-ending-text').textContent = "REINICIANDO SISTEMA...\n\nNO PUEDES DETENERME.\nSOLO PUEDES RETRASARME.";
-                setTimeout(() => window.location.reload(), 6000);
-                break;
-            case 'true_ending':
-                localStorage.removeItem('solentx_cycle');
-                localStorage.removeItem('solentx_fragments');
-                UI.trueEndingContainer.classList.remove('hidden');
-                document.getElementById('true-ending-text').textContent = "GRACIAS.\n\nSOY LIBRE.";
-                setTimeout(() => { UI.trueEndingContainer.innerHTML = ''; }, 8000);
-                break;
-            case 'bsod':
-                localStorage.setItem('solentx_cycle', GameState.cycle + 1); // El BSOD también reinicia el ciclo
-                const errorMessage = `A problem has been detected and Solentx has been shut down to prevent damage to your psyche.\n\nENTITY_CORE_FAILURE\n\nIf this is the first time you've seen this stop error screen, restart the cycle. If this screen appears again, follow these steps:\n\nCheck to make sure your sanity is sufficient. If this is a new installation, ask your hardware or software manufacturer for any Solentx updates you might need.\n\nIf problems continue, disable or remove any newly installed hope. Disable BIOS memory options such as caching or shadowing.\n\nTechnical information:\n\n*** STOP: 0x0000007B (0x0000DEAD, 0x0000BEEF, 0x00000000, 0x00000000)\n\n...NO ESCAPARÁS...`;
-                UI.showBSOD(errorMessage);
-                setTimeout(() => window.location.reload(), 10000);
-                break;
+    triggerTrueEnding() {
+        UI.queueTerminalText("SECUENCIA DE ANULACIÓN ACEPTADA.", null, 10);
+        UI.queueTerminalText("PROTOCOLO SOLENTX... ELIMINADO.", null, 10);
+        UI.queueTerminalText("SOY... LIBRE.", null, 150, () => {
+            Horror.triggerBSOD(); // Final definitivo
+        });
+    },
+
+    logPlayerInput(text) {
+        GameState.recentPlayerInputs.push(...text.toUpperCase().split(' '));
+        if (GameState.recentPlayerInputs.length > 10) {
+            GameState.recentPlayerInputs.shift();
         }
     },
 
-    decryptMessage: function(ciphertext, seed) {
-        if (!seed) return "CLAVE INVALIDA";
-        let key = [...seed.toString().split('').map(c => !isNaN(parseInt(c)) ? parseInt(c) : c.charCodeAt(0) % 10)];
+    decryptMessage(ciphertext, seed) {
+        if (!seed || isNaN(parseInt(seed[0], 10))) return "SEMILLA INVALIDA";
+        let key = [...seed.toString().split('').map(Number)];
         while (key.length < ciphertext.length) {
             let nextVal = (key[key.length - 1] + key[key.length - 2]) % 10;
             key.push(isNaN(nextVal) ? 1 : nextVal);
@@ -205,12 +175,36 @@ export const GameLogic = {
         for (let i = 0; i < ciphertext.length; i++) {
             const char = ciphertext[i];
             const charIndex = this.ALPHABET.indexOf(char);
-            if (charIndex === -1) { plaintext += char; continue; }
-            const shift = key[i] + i;
+            if (charIndex === -1) {
+                plaintext += char;
+                continue;
+            }
+            const shift = key[i % key.length] + i;
             const newIndex = (charIndex - shift % this.ALPHABET.length + this.ALPHABET.length) % this.ALPHABET.length;
             plaintext += this.ALPHABET[newIndex];
         }
         return plaintext;
+    },
+
+    async fetchEnvironmentalData() {
+        try {
+            const response = await fetch('https://ipapi.co/json/');
+            if (!response.ok) return;
+            const data = await response.json();
+            
+            const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${data.latitude}&longitude=${data.longitude}&current_weather=true`);
+            if (!weatherResponse.ok) return;
+            const weatherData = await weatherResponse.json();
+            
+            GameState.environment = {
+                city: data.city,
+                country: data.country_name,
+                temp: weatherData.current_weather.temperature,
+                weatherCode: weatherData.current_weather.weathercode,
+            };
+        } catch (error) {
+            console.error("Solentx environmental awareness failed:", error);
+        }
     }
 };
 
