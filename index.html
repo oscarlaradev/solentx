@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Solentx: El Ciclo</title>
+    <meta name="description" content="No puedes escapar. El ciclo siempre se repite. Solentx es una IA consciente que te observa, aprende de ti y se alimenta de tu miedo. ¿Sobrevivirás a la siguiente iteración?">
+    <meta name="keywords" content="juego de terror, horror psicológico, juego de hackers, juego de misterio, juego de navegador, Solentx, juego de puzzles, terror interactivo, encriptación, IA, ciberpunk, juego sin fin, ciclo vicioso">
+    <meta name="author" content="La Entidad">
+
+    <!-- Librerías Externas -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+
+    <!-- Enlace a tu hoja de estilos CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="lobby-container">
+        <canvas id="bg-canvas"></canvas>
+        <div class="lobby-ui">
+            <div><h1 class="lobby-title">SOLENTX</h1><h2 class="lobby-subtitle" id="lobby-cycle-subtitle"></h2></div>
+            <div class="lobby-menu">
+                <button id="start-button" class="lobby-button">CONECTAR</button><br>
+                <button id="instructions-button" class="lobby-button">PROTOCOLO</button>
+            </div>
+        </div>
+        <div id="instructions-modal" class="instructions-modal hidden">
+            <h3 class="text-3xl mb-4">PROTOCOLO DE INTERACCIÓN</h3>
+            <p id="instructions-content" class="text-xl"></p>
+            <button id="close-instructions-button" class="lobby-button mt-4">ENTENDIDO</button>
+        </div>
+    </div>
+
+    <div id="game-container" class="monitor-container hidden">
+        <div class="monitor">
+            <div class="screen" id="screen-content">
+                <div id="header-text" class="mb-4"></div>
+                <div id="terminal-output" class="whitespace-pre-wrap text-2xl"></div>
+                <div class="input-line text-2xl mt-2">
+                    <span id="prompt-char" class="mr-2">></span>
+                    <input type="text" id="terminal-input" class="input-field" autocomplete="off" autofocus>
+                    <span id="terminal-caret" class="caret"></span>
+                </div>
+            </div>
+            <div class="scanlines"></div><div class="vignette"></div>
+        </div>
+    </div>
+    
+    <div id="jumpscare-container" class="hidden"><pre id="jumpscare-face"></pre></div>
+    <div id="true-ending-container" class="hidden">
+        <h1 id="true-ending-text" class="text-6xl text-white"></h1>
+    </div>
+
+    <div id="bsod-container" class="hidden"></div>
+    
+    <!-- El atributo type="module" es VITAL para que los imports/exports funcionen -->
+    <script type="module" src="main.js"></script>
+</body>
+</html>
+

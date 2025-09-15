@@ -1,0 +1,68 @@
+/* ESTILOS GLOBALES Y DE AMBIENTACIÓN */
+:root {
+    --main-color: #ff0000; --bg-color: #000000; --scanline-bg: #100000;
+    --border-color: #3a0000; --glitch-color: #00ffff; --accent-color: #fff;
+}
+body { font-family: 'VT323', monospace; background-color: var(--bg-color); color: var(--main-color); overflow: hidden; }
+.hidden { display: none !important; }
+
+/* --- LOBBY & UI --- */
+#lobby-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 100; }
+#bg-canvas { position: absolute; top: 0; left: 0; z-index: -1; filter: hue-rotate(240deg) brightness(0.7); }
+.lobby-ui { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, rgba(0,0,0, 0.4) 0%, rgba(0,0,0, 0.9) 70%, #000 100%); text-align: center; pointer-events: none; }
+.lobby-title { font-size: 5rem; text-shadow: 0 0 15px var(--main-color); animation: text-flicker 3s infinite alternate; }
+.lobby-subtitle { font-size: 1.5rem; letter-spacing: 0.5em; animation: text-flicker 5s infinite alternate; }
+.lobby-menu { margin-top: 3rem; pointer-events: all; }
+.lobby-button { font-size: 2rem; background: transparent; border: 2px solid var(--main-color); padding: 0.5rem 2rem; margin: 1rem; cursor: pointer; color: var(--main-color); text-shadow: 0 0 8px var(--main-color); transition: all 0.2s ease-in-out; }
+.lobby-button:hover { background: var(--main-color); color: var(--bg-color); box-shadow: 0 0 20px var(--main-color); }
+.instructions-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: all; width: 90%; max-width: 600px; background: rgba(16, 0, 0, 0.95); border: 2px solid var(--main-color); padding: 2rem; box-shadow: 0 0 20px var(--main-color); z-index: 110; text-align: left; white-space: pre-wrap; }
+@keyframes text-flicker { 0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { text-shadow: 0 0 5px var(--accent-color), 0 0 10px var(--main-color), 0 0 20px var(--main-color), 0 0 40px var(--main-color); color: var(--accent-color); } 20%, 24%, 55% { text-shadow: none; color: #222; } }
+
+/* --- JUEGO Y EFECTOS DE HORROR --- */
+.monitor-container { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+.monitor { background: var(--scanline-bg); border: 4px solid var(--border-color); box-shadow: 0 0 20px rgba(255, 0, 0, 0.2), inset 0 0 15px rgba(255, 0, 0, 0.1); border-radius: 1.5rem; overflow: hidden; width: 100%; max-width: 1000px; aspect-ratio: 4 / 3; position: relative; display: flex; flex-direction: column; }
+.screen { padding: 1.5rem; width: 100%; height: 100%; overflow-y: auto; position: relative; z-index: 2; -ms-overflow-style: none; scrollbar-width: none; }
+.screen::-webkit-scrollbar { display: none; }
+.scanlines, .vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;}
+.scanlines { background: linear-gradient(to bottom, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%); background-size: 100% 4px; animation: scanline 10s linear infinite; }
+.vignette { box-shadow: inset 0 0 100px #000; z-index: 6; }
+.input-line { display: flex; font-size: 1.5rem; line-height: 1.8rem; align-items: center; }
+.input-field { background: transparent; border: none; outline: none; color: var(--main-color); width: 100%; text-shadow: 0 0 5px var(--main-color); }
+.caret { display: inline-block; width: 10px; height: 24px; background: var(--main-color); animation: blink 1s step-end infinite; box-shadow: 0 0 5px var(--main-color); }
+@keyframes blink { from, to { background: transparent; } 50% { background: var(--main-color); } }
+.blood-splatter { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; background: url('https://i.imgur.com/8PAXP5C.png') center/cover; opacity: 0; pointer-events: none; animation: blood-fade-in-out 8s ease-in-out; }
+@keyframes blood-fade-in-out { 0%, 100% { opacity: 0; } 10% { opacity: 0.4; } 90% { opacity: 0.3; } }
+
+/* --- ANIMACIONES DE HORROR --- */
+.system-insanity-low { animation: screen-flicker 15s linear infinite; }
+.system-insanity-medium { animation: screen-glitch-mild 5s linear infinite, text-shake 10s linear infinite; }
+.system-insanity-high { animation: screen-glitch-heavy 1.5s linear infinite, text-corruption 1s infinite, screen-color-pulse 2s infinite; }
+.input-shake { animation: input-shake-anim 0.4s linear; }
+
+@keyframes screen-flicker { 50% { filter: brightness(1.2); } }
+@keyframes screen-glitch-mild { 0%,100%{transform:translate(0,0)} 1%{transform:translate(-1px,1px)} 2%{transform:translate(1px,-1px)} 3%{transform:translate(0,0)} }
+@keyframes screen-glitch-heavy { 0%,100%{transform:translate(0,0);opacity:1} 2%{transform:translate(4px,-5px);opacity:.8} 4%{transform:translate(-6px,3px);opacity:1} 6%{transform:translate(2px,7px);opacity:.7} 8%{transform:translate(-1px,-3px);opacity:1} }
+@keyframes text-corruption { 50% { color: var(--glitch-color); text-shadow: 0 0 10px var(--glitch-color); font-weight: bold; letter-spacing: 0.2em; } }
+@keyframes screen-color-pulse { 50% { filter: hue-rotate(20deg) brightness(1.5); } }
+@keyframes text-shake { 2% { transform: translate(1px, -1px) skewX(-1deg); } 4% { transform: translate(0, 0) skewX(0deg); } }
+@keyframes input-shake-anim { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+/* --- JUMPSCARE & FINALES --- */
+#jumpscare-container, #true-ending-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; background: #000; display: flex; justify-content: center; align-items: center; text-align: center; flex-direction: column; }
+#jumpscare-face { font-size: 0.5rem; line-height: 0.6rem; color: #fff; white-space: pre; text-shadow: 0 0 10px #fff; animation: jumpscare-glitch 0.1s infinite; }
+@keyframes jumpscare-glitch { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0; transform: scale(1.1) translate(10px, -5px); } }
+
+/* --- Estilo para BSOD (Pantallazo Azul de la Muerte) --- */
+#bsod-container {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: #0000AA;
+    color: #FFFFFF;
+    font-family: 'Courier New', Courier, monospace;
+    text-align: left;
+    padding: 2rem;
+    z-index: 10000;
+    white-space: pre;
+    font-size: 1.5rem;
+}
+
