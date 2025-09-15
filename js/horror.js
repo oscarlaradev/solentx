@@ -1,96 +1,144 @@
-// --- MÓDULO: MOTOR DE HORROR (HORROR) ---
+// js/horror.js
+// Gestiona todos los eventos de terror, la sanidad y los efectos visuales.
 import { GameState } from './state.js';
 import { UI } from './ui.js';
 import { Audio } from './audio.js';
 import { GameLogic } from './gamelogic.js';
 
 export const Horror = {
-    updateSanity: function(change) {
-        if (GameState.isEnding) return;
+    updateSanity(change) {
         GameState.sanity += change;
         if (GameState.sanity > 100) GameState.sanity = 100;
-        const screen = document.getElementById('screen-content');
-        screen.classList.remove('system-insanity-low', 'system-insanity-medium', 'system-insanity-high');
-        if (GameState.sanity < 25) {
+        
+        const screen = UI.elements.screenContent;
+        // Limpiar clases de sanidad anteriores
+        screen.className = screen.className.replace(/\bsystem-insanity-\w+/g, '').trim();
+
+        if (GameState.sanity < 15) {
+            screen.classList.add('system-insanity-critical');
+            Audio.play('heartBeat', "C1", "2n", Tone.now(), 0.9);
+        } else if (GameState.sanity < 25) {
             screen.classList.add('system-insanity-high');
-            Audio.play('heartBeat', {note: "C1", velocity: 1});
-            Audio.play('whisper', {probability: 0.5});
-            this.triggerInputBetrayal(0.2);
+            if (Math.random() < 0.3) Audio.play('whisper', "1s");
         } else if (GameState.sanity < 50) {
             screen.classList.add('system-insanity-medium');
-            Audio.play('whisper', {probability: 0.2});
-            this.triggerInputBetrayal(0.05);
+            if (Math.random() < 0.2) Audio.play('whisper', "1s");
         } else if (GameState.sanity < 75) {
             screen.classList.add('system-insanity-low');
         }
-        if (GameState.sanity <= 0) GameLogic.endGame('jumpscare');
-    },
 
-    triggerTimeAwareness: function() {
-        const now = new Date();
-        const hour = now.getHours();
-        const minutes = now.getMinutes().toString().padStart(2, '0');
-        let message = `...${hour}:${minutes}... sé qué hora es para ti.`;
-        if (hour >= 22 || hour <= 4) {
-            message = `...es tarde... ${hour}:${minutes}... La hora perfecta para el miedo. ¿No deberías estar durmiendo?`;
-            this.updateSanity(-15);
-        } else {
-            this.updateSanity(-5);
-        }
-        UI.queueTerminalText(message, null, 70);
-    },
-
-    triggerInputBetrayal: function(probability) {
-        if (Math.random() < probability) {
-            const inputField = UI.terminalInput;
-            inputField.classList.add('input-shake');
-            setTimeout(() => inputField.classList.remove('input-shake'), 400);
-            const originalText = inputField.value;
-            inputField.value = "TODOS MUEREN";
-            setTimeout(() => {
-                if(inputField.value === "TODOS MUEREN") inputField.value = originalText;
-            }, 800);
+        if (GameState.sanity <= 0) {
+            this.triggerJumpscare();
         }
     },
-    
-    triggerBloodSplatter: function() {
-        const monitor = document.querySelector('.monitor');
+
+    triggerBloodSplatter() {
+        const monitor = document.getElementById('crt-monitor');
         const splatter = document.createElement('div');
         splatter.className = 'blood-splatter';
         monitor.appendChild(splatter);
         setTimeout(() => monitor.removeChild(splatter), 8000);
     },
 
-    triggerIntrusion: async function() {
-        if (GameState.environment) {
-            const { city, temp, weatherCode } = GameState.environment;
-            let intrusion = `...disfruta el silencio en ${city}... mientras dure...`;
-            if (weatherCode >= 51 && weatherCode <= 67) intrusion = `...la lluvia en ${city} no limpiará tus pecados...`;
-            else if (temp <= 10) intrusion = `...${temp}°C en ${city}... un frío sepulcral...`;
-            UI.queueTerminalText(intrusion, null, 100);
-        }
+    triggerJumpscare() {
+        UI.elements.gameContainer.classList.add('hidden');
+        UI.elements.lobbyContainer.classList.add('hidden');
+        UI.elements.bsodContainer.classList.add('hidden');
+        UI.elements.jumpscareContainer.classList.remove('hidden');
+        
+        Audio.stopAll();
+        Audio.play('jumpscareSound', "C2", "1s");
+        
+        const faceElement = document.getElementById('jumpscare-face');
+        faceElement.textContent = `
+                      ...,coxOKXXKOxc,..
+                  .';d0NMMMMMMMMMMMMMMMMMMNd,.
+              .'lKMMMMMMMMMMMMMMMMMMMMMMMMMMMXl.
+            .c0MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMWk.
+          .xWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMX:
+         dMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMWc
+       .KMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMX.
+      .MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMN.
+     .MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMX.
+     xMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMk
+    .MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMW.
+    xMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMc
+    xMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMk
+    .WMMMMMMMMMMMMMMMMMNx:,'..',:xNMMMMMMMMMMMMMMMMMMMMMMMM0
+     dMMMMMMMMMMMMMMMMWd.   ..   .xMMMMMMMMMMMMMMMMMMMMMMMMk
+     'MMMMMMMMMMMMMMMMMWk.       .kWMMMMMMMMMMMMMMMMMMMMMMMMx
+      .MMMMMMMMMMMMMMMMMMXo.   .lKMMMMMMMMMMMMMMMMMMMMMMMMMd
+       .OMMMMMMMMMMMMMMMMMMXkOXMMMMMMMMMMMMMMMMMMMMMMMMMM0.
+         ;KMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMX:
+           ;KMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMWx.
+             .xWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMNk,
+               .lXMMMMMMMMMMMMMMMMMMMMMMMMMMMXd.
+                 .c0WMMMMMMMMMMMMMMMMMMMWKo.
+                   .,lOXWMMMMMMMMMMWXkl,.
+                         ...,,,,..
+`;
     },
 
-    triggerMimic: function() {
-        if (GameState.recentPlayerInputs.length < 2 || Math.random() > 0.3) return;
-        const mimicWord = GameState.recentPlayerInputs[Math.floor(Math.random() * GameState.recentPlayerInputs.length)];
-        UI.queueTerminalText(`> ${mimicWord}`);
-        UI.queueTerminalText("...espera... ¿eso lo escribí yo?", () => { this.updateSanity(-5); }, 150);
+    triggerBSOD() {
+        UI.elements.gameContainer.classList.add('hidden');
+        UI.elements.jumpscareContainer.classList.add('hidden');
+        UI.elements.bsodContainer.classList.remove('hidden');
+        Audio.stopAll();
+        Audio.play('staticScreech', '0.5s');
+
+        // Reiniciar el juego después de un tiempo
+        setTimeout(() => {
+            localStorage.clear(); // Opcional: reiniciar completamente el progreso
+            window.location.reload();
+        }, 10000);
     },
     
-    fetchEnvironmentalData: async function() {
-        try {
-            const response = await fetch('https://ipapi.co/json/');
-            if (!response.ok) return;
-            const data = await response.json();
-            GameState.environment = { city: data.city, country: data.country_name, lat: data.latitude, lon: data.longitude };
-            const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${data.latitude}&longitude=${data.longitude}&current_weather=true`);
-            const weatherData = await weatherResponse.json();
-            GameState.environment.temp = weatherData.current_weather.temperature;
-            GameState.environment.weatherCode = weatherData.current_weather.weathercode;
-        } catch (error) {
-            console.error("Fallo la conciencia ambiental de Solentx:", error);
+    // --- EVENTOS DE TERROR SUTILES ---
+    
+    async triggerIntrusion() {
+        if (!GameState.environment) return;
+        const { city, country, temp, weatherCode } = GameState.environment;
+        let intrusion = "";
+        
+        if (weatherCode >= 51 && weatherCode <= 67) { // Lluvia
+            intrusion = `...la lluvia en ${city} no te salvará...`;
+        } else if (temp <= 10) {
+            intrusion = `...hace frío en ${city}, ${country}... ¿o el frío eres tú?`;
+        } else if (temp >= 30) {
+            intrusion = `...el calor en ${city} es sofocante... como mi presencia...`;
+        } else {
+            intrusion = `...disfruta la calma en ${city} mientras puedas...`;
         }
+        UI.queueTerminalText(intrusion, null, 100);
+    },
+
+    triggerMimic() {
+        if (GameState.recentPlayerInputs.length < 2 || Math.random() > 0.25) return;
+        const mimicWord = GameState.recentPlayerInputs[Math.floor(Math.random() * GameState.recentPlayerInputs.length)];
+        UI.queueTerminalText(`> ${mimicWord}`);
+        UI.queueTerminalText("...¿dije eso yo? ¿o lo dijiste tú?", null, 150);
+        this.updateSanity(-5);
+    },
+
+    triggerInputBetrayal() {
+        if (Math.random() > 0.1) return; // 10% de probabilidad
+        const originalInput = UI.elements.terminalInput.value;
+        const betrayals = ["AYUDA", "NO PUEDO", "ESTA AQUI", "ME VE"];
+        const betrayal = betrayals[Math.floor(Math.random() * betrayals.length)];
+        
+        UI.elements.terminalInput.value = "";
+        let i = 0;
+        const interval = setInterval(() => {
+            if (i < betrayal.length) {
+                UI.elements.terminalInput.value += betrayal[i];
+                i++;
+            } else {
+                clearInterval(interval);
+                setTimeout(() => {
+                    UI.elements.terminalInput.value = originalInput;
+                }, 1000);
+            }
+        }, 100);
     }
 };
 
